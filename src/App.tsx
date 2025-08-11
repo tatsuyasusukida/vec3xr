@@ -3,7 +3,7 @@ import { Label } from "@radix-ui/react-label";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { createXRStore, XR, XROrigin } from "@react-three/xr";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, Suspense, use, useCallback, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import z from "zod";
 import { Arrow, type ArrowProps } from "./components/Arrow";
@@ -98,7 +98,9 @@ function App() {
           <OffsetSliders offset={offset} setOffset={setOffset} />
           <ScaleSlider scale={scale} setScale={setScale} />
         </div>
-        <XRButtons />
+        <Suspense fallback={<p>VR/ARのサポート状況を確認中...</p>}>
+          <XRButtons />
+        </Suspense>
       </ControlPanel>
     </div>
   );
@@ -286,26 +288,24 @@ function ScaleSlider({
   );
 }
 
+async function checkXRSupport(): Promise<{
+  vr: boolean;
+  ar: boolean;
+}> {
+  if (!navigator.xr) {
+    return { vr: false, ar: false };
+  }
+
+  const vr = await navigator.xr.isSessionSupported("immersive-vr");
+  const ar = await navigator.xr.isSessionSupported("immersive-ar");
+
+  return { vr, ar };
+}
+
+const checkXRSupportPromise = checkXRSupport();
+
 function XRButtons() {
-  const [isSupported, setIsSupported] = useState({
-    vr: false,
-    ar: false,
-  });
-
-  useEffect(() => {
-    if (!navigator.xr) {
-      return;
-    }
-
-    Promise.all([
-      navigator.xr.isSessionSupported("immersive-vr"),
-      navigator.xr.isSessionSupported("immersive-ar"),
-    ])
-      .then(([vr, ar]) => {
-        setIsSupported({ vr, ar });
-      })
-      .catch((err) => console.error(err));
-  }, []);
+  const isSupported = use(checkXRSupportPromise);
 
   const onClickVR = () => {
     xrStore.enterVR();
